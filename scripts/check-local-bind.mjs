@@ -15,13 +15,17 @@ const port = Number(process.env.PORT || 32000 + Math.floor(Math.random() * 2000)
 const startupTimeoutMs = 5000;
 const duplicateExitTimeoutMs = 2500;
 
-function spawnCanvas() {
+function spawnCanvas(host) {
   const env = {
     ...process.env,
     PORT: String(port),
     LOG_LEVEL: 'error',
   };
-  delete env.HOST;
+  if (host) {
+    env.HOST = host;
+  } else {
+    delete env.HOST;
+  }
 
   return spawn(runtime, runtimeArgs, {
     cwd: repoRoot,
@@ -102,6 +106,7 @@ async function killChild(child) {
 
 let first;
 let second;
+let bindAll;
 
 try {
   first = spawnCanvas();
@@ -124,9 +129,20 @@ try {
     throw new Error('Second canvas server exited successfully instead of failing.');
   }
 
+  bindAll = spawnCanvas('::');
+  const bindAllOutput = collectOutput(bindAll);
+  const bindAllExit = await waitForExit(bindAll, duplicateExitTimeoutMs);
+
+  if (!bindAllExit) {
+    throw new Error('Canvas server with HOST=:: stayed running while a loopback server was active.');
+  }
+  if (bindAllExit.code === 0) {
+    throw new Error('Canvas server with HOST=:: exited successfully instead of failing.');
+  }
+
   console.log(
     `Local bind check passed on port ${port} using ${runtimeName}: ` +
-    'default bind is IPv4 loopback only and duplicate startup fails.'
+    'default bind is IPv4 loopback only, duplicate startup fails, and HOST=:: is guarded.'
   );
 
   await killChild(first);
@@ -136,7 +152,11 @@ try {
   if (process.env.DEBUG_BIND_CHECK && secondOutput()) {
     console.error(secondOutput());
   }
+  if (process.env.DEBUG_BIND_CHECK && bindAllOutput()) {
+    console.error(bindAllOutput());
+  }
 } catch (error) {
+  if (bindAll) await killChild(bindAll);
   if (second) await killChild(second);
   if (first) await killChild(first);
   console.error((error instanceof Error) ? error.message : String(error));

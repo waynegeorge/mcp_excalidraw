@@ -1214,7 +1214,7 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 // Start server
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '127.0.0.1';
-const LOOPBACK_GUARD_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0']);
+const LOOPBACK_GUARD_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0', '::']);
 const LOOPBACK_ADDRESSES = ['127.0.0.1', '::1'];
 
 function formatHostForUrl(host: string): string {
@@ -1252,7 +1252,7 @@ async function findExistingLoopbackListener(port: number): Promise<string | null
 server.on('error', (error: NodeJS.ErrnoException) => {
   if (error.code === 'EADDRINUSE') {
     const address = (error as NodeJS.ErrnoException & { address?: string }).address || HOST;
-    logger.error(`Canvas server port ${PORT} is already in use on ${address}.`);
+    logger.error(`Canvas server port ${PORT} is already in use on ${formatHostForUrl(address)}.`);
   } else if (error.code === 'EACCES') {
     logger.error(`Canvas server cannot bind ${formatHostForUrl(HOST)}:${PORT}: permission denied.`);
   } else {
